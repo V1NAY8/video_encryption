@@ -6,7 +6,7 @@ import numpy as np
 import tensorflow as tf
 import cv2
 import time
-
+import random
 
 class DetectorAPI:
     def __init__(self, path_to_ckpt):
@@ -43,7 +43,7 @@ class DetectorAPI:
             feed_dict={self.image_tensor: image_np_expanded})
         end_time = time.time()
 
-        print("Elapsed Time:", end_time-start_time)
+        # print("Elapsed Time:", end_time-start_time)
 
         im_height, im_width,_ = image.shape
         boxes_list = [None for i in range(boxes.shape[1])]
@@ -63,24 +63,51 @@ if __name__ == "__main__":
     model_path = '/home/titan/vinay/faster_rcnn_inception_v2_coco_2018_01_28/frozen_inference_graph.pb'
     
     odapi = DetectorAPI(path_to_ckpt=model_path)
-    threshold = 0.7
+    threshold = 0.75
     cap = cv2.VideoCapture('ending.mp4')
+
+    with open('labels.txt', 'r') as f:
+        x = f.readlines()
+        x = [k.strip() for k in x]
+
+    font = cv2.FONT_HERSHEY_SIMPLEX  
+
+    def colors(n):
+        ret = []
+        for i in range(n):
+            color = tuple(map(int, np.random.choice(range(256), size=3)))
+            ret.append(color)
+        return ret
+    
+    colors = colors(len(x))
+    names_dict = list(zip(x, tuple(colors)))
+    names_dict = dict(enumerate(names_dict))
+    print(names_dict)
 
     while True:
         r, img = cap.read()
         # img = cv2.resize(img, (1280, 720))
 
-
         boxes, scores, classes, num = odapi.processFrame(img)
+        # print(boxes)
+        # print(classes)
 
         # Visualization of the results of a detection.
 
-        for i in range(len(boxes)):
-            # Class 1 represents human
-            if classes[i] == 1 and scores[i] > threshold:
-                box = boxes[i]
-                cv2.rectangle(img,(box[1],box[0]),(box[3],box[2]),(255,0,0),2)
+        total = list(zip(classes,boxes))
+        # print(total)
 
+        for i in range(len(total)):
+            if total[i][0] in names_dict.keys() and scores[i] > threshold and (sum(total[i][1])!=0):
+                box = total[i][1]
+                color_display = names_dict[i][1]
+                cv2.rectangle(img, (box[1], box[0]), (box[3], box[2]), (color_display), 2 )
+                print(names_dict[i][1])
+                cv2.putText(img, names_dict[i][0], (box[1], box[0]-10), font, 0.35, names_dict[i][1], 1, cv2.LINE_AA)
+            
+
+
+       
         cv2.imshow("preview", img)
         key = cv2.waitKey(1)
         if key & 0xFF == ord('q'):
